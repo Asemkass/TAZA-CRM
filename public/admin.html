@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Таза · Админ</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="mark">Таза</span><span class="sub">Админ-панель</span></div>
+    <div class="whoami"><span id="whoName"></span><span class="logout-link" onclick="logout()">Выйти</span></div>
+  </header>
+
+   <nav class="tabs">
+    <button data-tab="new" class="active">Новый звонок</button>
+    <button data-tab="list">Договоры</button>
+    <button data-tab="clients">Карта клиента</button>
+    <button data-tab="cash">Касса</button>
+    <button data-tab="staff">Сотрудники</button>
+  </nav>
+
+  <!-- НОВЫЙ ДОГОВОР -->
+  <section id="view-new">
+    <div class="card">
+      <h1 class="formtitle">Новый договор</h1>
+      <p class="formhint">Заполните данные во время звонка клиента</p>
+
+      <div class="field required"><label>Телефон клиента</label><input id="f_phone" type="tel" placeholder="+7 700 000 00 00"></div>
+      <div class="field"><label>Имя клиента</label><input id="f_name" type="text" placeholder="Например, Анара"></div>
+
+      <div class="field required">
+        <label>Город / район</label>
+        <select id="f_city">
+          <option value="">Выберите район</option>
+          <option>Есиль</option><option>Алматы</option><option>Сарыарка</option>
+          <option>Байконур</option><option>Сарайшык</option><option>Нура</option>
+          <option value="__other">Другой...</option>
+        </select>
+        <input id="f_city_other" type="text" placeholder="Введите район" style="margin-top:8px;display:none;">
+      </div>
+
+      <div class="field required"><label>Адрес</label><input id="f_addr" type="text" placeholder="Улица, дом"></div>
+
+      <div class="grid2">
+        <div class="field"><label>Подъезд</label><input id="f_entrance" type="text"></div>
+        <div class="field"><label>Этаж</label><input id="f_floor" type="number"></div>
+      </div>
+      <div class="field"><label>Кв.</label><input id="f_apt" type="text" placeholder="напр. 24"></div>
+
+      <div class="grid2">
+        <div class="field required"><label>Кол-во ковров</label><input id="f_qty" type="number" min="1"></div>
+        <div class="field"><label>Площадь, м²</label><input id="f_area" type="number" step="0.01"></div>
+      </div>
+
+      <div class="grid2">
+        <div class="field required"><label>Дата</label><input id="f_date" type="date"></div>
+        <div class="field"><label>Статус</label>
+          <select id="f_status">
+            <option value="new_call">Новый звонок</option>
+            <option value="pickup">Забор ковров</option>
+            <option value="wash">Стирка</option>
+            <option value="delivery">Доставка</option>
+            <option value="closed">Закрыто</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field"><label>Курьер (если готово к забору/доставке)</label>
+        <select id="f_courier"><option value="">Не назначен</option></select>
+      </div>
+
+           <div class="field" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="f_delivery" style="width:auto;">
+        <label for="f_delivery" style="margin:0;">Доставка на дом (+2000 ₸)</label>
+      </div>
+
+      <div class="grid2">
+        <div class="field"><label>Цена за м², ₸</label><input id="f_pricem2" type="number"></div>
+        <div class="field required"><label>Стоимость, ₸</label><input id="f_cost" type="number"></div>
+      </div>
+
+      <div class="field">
+        <label>Способ оплаты</label>
+        <select id="f_payment">
+          <option value="">Не указано</option>
+          <option value="cash">Наличными</option>
+          <option value="card">Картой</option>
+        </select>
+      </div>
+      <div class="field"><label>Комментарий</label><textarea id="f_comment"></textarea></div>
+
+      <button class="btn btn-primary" id="saveBtn">Сохранить договор</button>
+    </div>
+  </section>
+
+  <!-- СПИСОК ДОГОВОРОВ -->
+  <section id="view-list" style="display:none;">
+    <div id="cityChips" class="city-chips"></div>
+    <div class="search"><input id="searchInput" type="text" placeholder="Поиск по телефону, адресу, имени"></div>
+    <div id="listContainer"></div>
+  </section>
+
+  <!-- КАРТА КЛИЕНТА -->
+  <section id="view-clients" style="display:none;">
+    <div class="search"><input id="clientSearch" type="text" placeholder="Поиск клиента по телефону или имени"></div>
+    <div id="clientsContainer"></div>
+  </section>
+
+    <!-- КАССА -->
+  <section id="view-cash" style="display:none;">
+    <div id="cashStats"></div>
+  </section>
+
+  <!-- СОТРУДНИКИ -->
+  <section id="view-staff" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <h1 class="formtitle">Добавить сотрудника</h1>
+      <div class="grid2">
+        <div class="field"><label>Имя</label><input id="s_name" type="text"></div>
+        <div class="field"><label>Роль</label>
+          <select id="s_role"><option value="courier">Курьер</option><option value="admin">Админ</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Email (логин)</label><input id="s_email" type="email"></div>
+      <div class="field"><label>Пароль</label><input id="s_password" type="text" placeholder="минимум 6 символов"></div>
+      <div class="field"><label>Телефон</label><input id="s_phone" type="tel"></div>
+      <button class="btn btn-primary" id="addStaffBtn">Создать учётку</button>
+    </div>
+    <div id="staffContainer"></div>
+  </section>
+</div>
+
+<div id="detailOverlay" class="overlay" style="display:none;"></div>
+
+<script src="/common.js"></script>
+<script>
+let contracts = [];
+let couriers = [];
+let activeCityFilter = null;
+
+async function init(){
+  const me = await whoAmI();
+  if(!me) return;
+  if(me.role !== 'admin'){ window.location.href = '/courier.html'; return; }
+  document.getElementById('whoName').textContent = me.full_name;
+  document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
+  });
+
+  document.getElementById('f_city').addEventListener('change', e=>{
+    document.getElementById('f_city_other').style.display = e.target.value==='__other' ? 'block':'none';
+  });
+
+  await loadStaff();
+  await loadContracts();
+  wireForm();
+  wireStaffForm();
+  document.getElementById('searchInput').addEventListener('input', renderList);
+  document.getElementById('clientSearch').addEventListener('input', ()=>loadClients());
+}
+
+function switchTab(tab){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  ['new','list','clients','cash','staff'].forEach(t=>{
+    document.getElementById('view-'+t).style.display = (t===tab)?'block':'none';
+  });
+  if(tab==='list') renderList();
+  if(tab==='clients') loadClients();
+  if(tab==='cash') loadCash();
+  if(tab==='staff') renderStaff();
+}
+
+// ---------- Contracts: create ----------
+function getCityValue(){
+  const sel = document.getElementById('f_city');
+  return sel.value==='__other' ? document.getElementById('f_city_other').value.trim() : sel.value;
+}
+
+const DELIVERY_FEE = 2000;
+
+function wireForm(){
+  const area = document.getElementById('f_area');
+  const price = document.getElementById('f_pricem2');
+  const cost = document.getElementById('f_cost');
+  const delivery = document.getElementById('f_delivery');
+  const qty = document.getElementById('f_qty');
+  let manual = false;
+  cost.addEventListener('input', ()=>manual=true);
+  function recalc(){
+    const a=parseFloat(area.value), p=parseFloat(price.value), q=parseFloat(qty.value) || 1;
+    if(!isNaN(a)&&!isNaN(p)&&!manual) cost.value = Math.round(a*p*q + (delivery.checked?DELIVERY_FEE:0));
+  }
+  area.addEventListener('input', recalc);
+  price.addEventListener('input', recalc);
+  delivery.addEventListener('change', recalc);
+  qty.addEventListener('input', recalc);
+
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    const phone = document.getElementById('f_phone').value.trim();
+    const city = getCityValue();
+    const addr = document.getElementById('f_addr').value.trim();
+    const qty = document.getElementById('f_qty').value;
+    const date = document.getElementById('f_date').value;
+    const costVal = document.getElementById('f_cost').value;
+    if(!phone||!city||!addr||!qty||!date||!costVal){ showToast('Заполните обязательные поля (*)'); return; }
+
+    try{
+      await api('/api/contracts', {method:'POST', body: JSON.stringify({
+        phone, client_name: document.getElementById('f_name').value.trim(),
+        city, address: addr,
+        apartment: document.getElementById('f_apt').value,
+        entrance: document.getElementById('f_entrance').value,
+        floor: document.getElementById('f_floor').value,
+        qty_carpets: qty, area: area.value || null,
+        price_per_m2: price.value || null, cost: costVal,
+        status: document.getElementById('f_status').value,
+        assigned_courier_id: document.getElementById('f_courier').value || null,
+                contract_date: date, comment: document.getElementById('f_comment').value.trim(),
+        payment_method: document.getElementById('f_payment').value || null
+      })});
+      showToast('Договор сохранён');
+      ['f_phone','f_name','f_addr','f_entrance','f_floor','f_apt','f_qty','f_area','f_pricem2','f_cost','f_comment','f_city_other']
+        .forEach(id=>document.getElementById(id).value='');
+       document.getElementById('f_delivery').checked = false;
+        document.getElementById('f_payment').value = '';
+       document.getElementById('f_city').value='';
+      document.getElementById('f_city_other').style.display='none';
+      document.getElementById('f_status').value='new_call';
+      document.getElementById('f_courier').value='';
+      document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+      manual=false;
+      await loadContracts();
+      switchTab('list');
+    }catch(e){ showToast(e.message); }
+  });
+}
+
+// ---------- Contracts: list ----------
+async function loadContracts(){
+  try{ contracts = await api('/api/contracts'); renderList(); }
+  catch(e){ showToast(e.message); }
+}
+
+function renderCityChips(){
+  const el = document.getElementById('cityChips');
+  const counts = {};
+  contracts.forEach(c=>{ const city=c.city||'Без города'; counts[city]=(counts[city]||0)+1; });
+  const cities = Object.keys(counts).sort();
+  if(cities.length===0){ el.innerHTML=''; return; }
+  el.innerHTML = `<button class="chip ${!activeCityFilter?'active':''}" data-city="">Все (${contracts.length})</button>` +
+    cities.map(c=>`<button class="chip ${activeCityFilter===c?'active':''}" data-city="${escapeHtml(c)}">${escapeHtml(c)} (${counts[c]})</button>`).join('');
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{ activeCityFilter = chip.dataset.city || null; renderList(); });
+  });
+}
+
+function renderList(){
+  renderCityChips();
+  const container = document.getElementById('listContainer');
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filtered = contracts.filter(c=>{
+    const matchesCity = !activeCityFilter || (c.city||'Без города')===activeCityFilter;
+    const matchesQ = !q || (c.client_phone||'').toLowerCase().includes(q) ||
+      (c.address||'').toLowerCase().includes(q) || (c.client_name||'').toLowerCase().includes(q);
+    return matchesCity && matchesQ;
+  });
+  if(filtered.length===0){
+    container.innerHTML = `<div class="empty"><div class="big">🧺</div><div class="t">${contracts.length===0?'Пока нет договоров':'Ничего не найдено'}</div></div>`;
+    return;
+  }
+  container.innerHTML = `<div class="list">${filtered.map(cardHtml).join('')}</div>`;
+  container.querySelectorAll('[data-id]').forEach(el=>el.addEventListener('click', ()=>openDetail(el.dataset.id)));
+}
+
+function cardHtml(c){
+  const meta = STATUS_META[c.status]||STATUS_META.new_call;
+  const loc = [c.floor?`эт. ${c.floor}`:null, c.apartment?`кв. ${c.apartment}`:null].filter(Boolean).join(', ');
+  return `<div class="item" data-id="${c.id}">
+    <div class="row1">
+      <div><div class="phone">${escapeHtml(c.client_phone||'—')}</div>
+      <div class="addr">${c.city?escapeHtml(c.city)+' · ':''}${escapeHtml(c.address)}${loc?' · '+loc:''}</div></div>
+      <span class="badge" style="background:${meta.color}">${meta.label}</span>
+    </div>
+    <div class="row2"><span>Ковров: <b>${escapeHtml(c.qty_carpets||'—')}</b></span>
+      ${c.courier_name?`<span>Курьер: <b>${escapeHtml(c.courier_name)}</b></span>`:''}</div>
+    <div class="row3"><span class="cost">${fmtMoney(c.cost)}</span><span class="date">${fmtDate(c.contract_date)}</span></div>
+  </div>`;
+}
+
+function openDetail(id){
+  const c = contracts.find(x=>String(x.id)===String(id));
+  if(!c) return;
+  const overlay = document.getElementById('detailOverlay');
+  overlay.style.display='flex';
+  overlay.innerHTML = `<div class="sheet">
+    <div class="sheet-head"><h2>${escapeHtml(c.client_phone)}</h2><button class="close-x" id="closeDetail">✕</button></div>
+    <div class="field"><label>Статус</label>
+      <select id="editStatus">${Object.entries(STATUS_META).map(([k,v])=>`<option value="${k}" ${k===c.status?'selected':''}>${v.label}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Курьер</label>
+      <select id="editCourier"><option value="">Не назначен</option>
+        ${couriers.map(u=>`<option value="${u.id}" ${u.id===c.assigned_courier_id?'selected':''}>${escapeHtml(u.full_name)}</option>`).join('')}
+      </select>
+    </div>
+        <div class="field"><label>Стоимость, ₸</label><input id="editCost" type="number" value="${c.cost}"></div>
+    <div class="field"><label>Способ оплаты</label>
+      <select id="editPayment">
+        <option value="" ${!c.payment_method?'selected':''}>Не указано</option>
+        <option value="cash" ${c.payment_method==='cash'?'selected':''}>Наличными</option>
+        <option value="card" ${c.payment_method==='card'?'selected':''}>Картой</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="saveDetailBtn" style="margin-bottom:10px;">Сохранить изменения</button>
+    <button class="btn btn-ghost" id="deleteBtn">Удалить договор</button>
+  </div>`;
+  document.getElementById('closeDetail').addEventListener('click', closeDetail);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
+  document.getElementById('saveDetailBtn').addEventListener('click', async ()=>{
+    try{
+            await api(`/api/contracts/${c.id}`, {method:'PATCH', body: JSON.stringify({
+        status: document.getElementById('editStatus').value,
+        assigned_courier_id: document.getElementById('editCourier').value || null,
+        cost: document.getElementById('editCost').value,
+        payment_method: document.getElementById('editPayment').value || null
+      })});
+      showToast('Изменения сохранены');
+      closeDetail(); await loadContracts();
+    }catch(e){ showToast(e.message); }
+  });
+  document.getElementById('deleteBtn').addEventListener('click', async ()=>{
+    if(!confirm('Удалить этот договор?')) return;
+    try{ await api(`/api/contracts/${c.id}`, {method:'DELETE'}); showToast('Договор удалён'); closeDetail(); await loadContracts(); }
+    catch(e){ showToast(e.message); }
+  });
+}
+function closeDetail(){ document.getElementById('detailOverlay').style.display='none'; document.getElementById('detailOverlay').innerHTML=''; }
+
+// ---------- Client card ----------
+async function loadClients(){
+  const q = document.getElementById('clientSearch').value.trim();
+  try{
+    const clients = await api('/api/clients' + (q?`?q=${encodeURIComponent(q)}`:''));
+    renderClients(clients);
+  }catch(e){ showToast(e.message); }
+}
+function renderClients(clients){
+  const el = document.getElementById('clientsContainer');
+  if(clients.length===0){ el.innerHTML = `<div class="empty"><div class="big">👤</div><div class="t">Клиенты не найдены</div></div>`; return; }
+  el.innerHTML = `<div class="list">${clients.map(cl=>`
+    <div class="item" data-cid="${cl.id}">
+      <div class="row1"><div><div class="phone">${escapeHtml(cl.phone)}</div>
+      <div class="addr">${escapeHtml(cl.name||'Имя не указано')}</div></div></div>
+      <div class="row2"><span>Договоров: <b>${cl.contracts_count}</b></span><span>Первое обращение: <b>${fmtDate(cl.first_contact)}</b></span></div>
+      <div class="row3"><span class="cost">${fmtMoney(cl.total_spent)}</span><span class="date">${fmtDate(cl.last_update)}</span></div>
+    </div>`).join('')}</div>`;
+  el.querySelectorAll('[data-cid]').forEach(node=>node.addEventListener('click', ()=>openClientCard(node.dataset.cid)));
+}
+async function openClientCard(id){
+  try{
+    const client = await api(`/api/clients/${id}`);
+    const overlay = document.getElementById('detailOverlay');
+    overlay.style.display='flex';
+    overlay.innerHTML = `<div class="sheet">
+      <div class="sheet-head"><h2>${escapeHtml(client.phone)}</h2><button class="close-x" id="closeDetail">✕</button></div>
+      <p class="formhint">${escapeHtml(client.name||'Имя не указано')} · Первое обращение: ${fmtDate(client.first_contact)}</p>
+      <div class="list">${client.contracts.map(cardHtml).join('') || '<div class="empty">Нет договоров</div>'}</div>
+    </div>`;
+    document.getElementById('closeDetail').addEventListener('click', closeDetail);
+    overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
+  }catch(e){ showToast(e.message); }
+}
+// ---------- Cash ----------
+async function loadCash(){
+  try{
+    const data = await api('/api/contracts/cash-summary');
+    renderCash(data);
+  }catch(e){ showToast(e.message); }
+}
+function renderCash(data){
+  const el = document.getElementById('cashStats');
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat"><div class="n">${fmtMoney(data.total)}</div><div class="l">Всего заработано (закрытые договоры)</div></div>
+      <div class="stat"><div class="n">${data.count}</div><div class="l">Закрытых договоров</div></div>
+    </div>
+    <div class="card">
+      <h1 class="formtitle">По дням</h1>
+      <div class="list">${data.byDay.map(d=>`
+        <div class="item" style="cursor:default;">
+          <div class="row1"><div class="phone">${fmtDate(d.day)}</div>
+          <span class="badge" style="background:var(--teal)">${d.count} дог.</span></div>
+          <div class="row3"><span class="cost">${fmtMoney(d.total)}</span></div>
+        </div>`).join('') || '<div class="empty">Пока нет закрытых договоров</div>'}
+      </div>
+    </div>`;
+}
+
+// ---------- Staff ----------
+async function loadStaff(){
+  try{
+    const staff = await api('/api/users');
+    couriers = staff.filter(u=>u.role==='courier' && u.is_active);
+    const sel = document.getElementById('f_courier');
+    sel.innerHTML = '<option value="">Не назначен</option>' + couriers.map(u=>`<option value="${u.id}">${escapeHtml(u.full_name)}</option>`).join('');
+    window.__staff = staff;
+    renderStaff();
+  }catch(e){ showToast(e.message); }
+}
+function renderStaff(){
+  const staff = window.__staff || [];
+  const el = document.getElementById('staffContainer');
+  el.innerHTML = `<div class="list">${staff.map(u=>`
+    <div class="item" style="cursor:default;">
+      <div class="row1"><div><div class="phone">${escapeHtml(u.full_name)}</div>
+      <div class="addr">${escapeHtml(u.email)}${u.phone?' · '+escapeHtml(u.phone):''}</div></div>
+      <span class="badge" style="background:${u.role==='admin'?'var(--teal)':'var(--status-pickup)'}">${u.role==='admin'?'Админ':'Курьер'}</span></div>
+      <div class="row3">
+        <span class="date">${u.is_active?'Активен':'Отключён'}</span>
+        <button class="btn btn-sm ${u.is_active?'btn-ghost':'btn-primary'}" data-toggle="${u.id}" data-active="${u.is_active}">
+          ${u.is_active?'Отключить':'Включить'}</button>
+      </div>
+    </div>`).join('')}</div>`;
+  el.querySelectorAll('[data-toggle]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      try{
+        await api(`/api/users/${btn.dataset.toggle}`, {method:'PATCH', body: JSON.stringify({is_active: btn.dataset.active!=='true'})});
+        showToast('Обновлено'); await loadStaff();
+      }catch(e){ showToast(e.message); }
+    });
+  });
+}
+function wireStaffForm(){
+  document.getElementById('addStaffBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('s_email').value.trim();
+    const password = document.getElementById('s_password').value;
+    const role = document.getElementById('s_role').value;
+    const full_name = document.getElementById('s_name').value.trim();
+    const phone = document.getElementById('s_phone').value.trim();
+    if(!email||!password||!full_name){ showToast('Заполните имя, email и пароль'); return; }
+    try{
+      await api('/api/users', {method:'POST', body: JSON.stringify({email,password,role,full_name,phone})});
+      showToast('Сотрудник добавлен');
+      ['s_name','s_email','s_password','s_phone'].forEach(id=>document.getElementById(id).value='');
+      await loadStaff();
+    }catch(e){ showToast(e.message); }
+  });
+}
+
+init();
+</script>
+</body>
+</html>

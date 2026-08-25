@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Таза · Вход</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <div class="brand-mark">Таза</div>
+    <p class="login-sub">Вход в систему</p>
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="admin@kzblesk.kz">
+    </div>
+    <div class="field">
+      <label>Пароль</label>
+      <input id="password" type="password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" id="loginBtn">Войти</button>
+    <p class="error" id="errorMsg"></p>
+  </div>
+
+<script>
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('errorMsg');
+  errEl.textContent = '';
+  try{
+    const res = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if(!res.ok){ errEl.textContent = data.error || 'Ошибка входа'; return; }
+    window.location.href = data.role === 'admin' ? '/admin.html' : '/courier.html';
+  }catch(e){
+    errEl.textContent = 'Не удалось подключиться к серверу';
+  }
+});
+document.getElementById('password').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('loginBtn').click();
+});
+</script>
+</body>
+</html>

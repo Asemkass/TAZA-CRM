@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Таза · Мои заявки</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="mark">Таза</span><span class="sub">Мои заявки</span></div>
+    <div class="whoami"><span id="whoName"></span><span class="logout-link" onclick="logout()">Выйти</span></div>
+  </header>
+  <section>
+    <div id="listContainer"></div>
+  </section>
+</div>
+
+<div id="detailOverlay" class="overlay" style="display:none;"></div>
+
+<script src="/common.js"></script>
+<script>
+let contracts = [];
+
+async function init(){
+  const me = await whoAmI();
+  if(!me) return;
+  if(me.role !== 'courier'){ window.location.href = '/admin.html'; return; }
+  document.getElementById('whoName').textContent = me.full_name;
+  await loadContracts();
+}
+
+async function loadContracts(){
+  try{
+    contracts = await api('/api/contracts');
+    renderList();
+  }catch(e){ showToast(e.message); }
+}
+
+function renderList(){
+  const container = document.getElementById('listContainer');
+  if(contracts.length===0){
+    container.innerHTML = `
+      <div class="empty">
+        <div class="big">📦</div>
+        <div class="t">Пока нет назначенных заявок</div>
+        <div>Как только админ назначит вам забор или доставку, заявка появится здесь</div>
+      </div>`;
+    return;
+  }
+  container.innerHTML = `<div class="list">${contracts.map(cardHtml).join('')}</div>`;
+  container.querySelectorAll('[data-id]').forEach(el=>{
+    el.addEventListener('click', ()=> openDetail(el.getAttribute('data-id')));
+  });
+}
+
+function cardHtml(c){
+  const meta = STATUS_META[c.status] || STATUS_META.new_call;
+  const loc = [c.floor?`эт. ${c.floor}`:null, c.apartment?`кв. ${c.apartment}`:null].filter(Boolean).join(', ');
+  return `
+    <div class="item" data-id="${c.id}">
+      <div class="row1">
+        <div>
+          <div class="phone">${escapeHtml(c.client_phone)}</div>
+          <div class="addr">${c.city?escapeHtml(c.city)+' · ':''}${escapeHtml(c.address)}${loc?' · '+loc:''}</div>
+        </div>
+        <span class="badge" style="background:${meta.color}">${meta.label}</span>
+      </div>
+      <div class="row2"><span>Ковров: <b>${escapeHtml(c.qty_carpets)}</b></span></div>
+      <div class="row3">
+        <span class="cost">${fmtMoney(c.cost)}</span>
+        <span class="date">${fmtDate(c.contract_date)}</span>
+      </div>
+    </div>`;
+}
+
+const NEXT_STATUS = { pickup: 'delivery', delivery: 'closed' };
+const NEXT_LABEL = { pickup: 'Отметить: в пути / стирка', delivery: 'Отметить: доставлено' };
+
+function openDetail(id){
+  const c = contracts.find(x=>String(x.id)===String(id));
+  if(!c) return;
+  const meta = STATUS_META[c.status] || STATUS_META.new_call;
+  const overlay = document.getElementById('detailOverlay');
+  overlay.style.display='flex';
+  const nextStatus = NEXT_STATUS[c.status];
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2>${escapeHtml(c.client_phone)}</h2>
+        <button class="close-x" id="closeDetail">✕</button>
+      </div>
+      <div class="field"><label>Город</label><input value="${escapeHtml(c.city||'—')}" disabled></div>
+      <div class="field"><label>Адрес</label><input value="${escapeHtml(c.address)}" disabled></div>
+      <div class="grid2">
+        <div class="field"><label>Этаж</label><input value="${escapeHtml(c.floor||'—')}" disabled></div>
+        <div class="field"><label>Кв.</label><input value="${escapeHtml(c.apartment||'—')}" disabled></div>
+      </div>
+      <div class="field"><label>Кол-во ковров</label><input value="${escapeHtml(c.qty_carpets)}" disabled></div>
+      ${c.comment ? `<div class="field"><label>Комментарий</label><textarea disabled>${escapeHtml(c.comment)}</textarea></div>` : ''}
+      <div class="field"><label>Текущий статус</label>
+        <input value="${meta.label}" disabled>
+      </div>
+      ${nextStatus ? `<button class="btn btn-primary" id="advanceBtn">${NEXT_LABEL[c.status]}</button>` :
+        `<p style="text-align:center;color:var(--muted);font-size:13.5px;">Заявка завершена</p>`}
+    </div>`;
+  document.getElementById('closeDetail').addEventListener('click', closeDetail);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
+  if(nextStatus){
+    document.getElementById('advanceBtn').addEventListener('click', async ()=>{
+      try{
+        await api(`/api/contracts/${c.id}`, {method:'PATCH', body: JSON.stringify({status: nextStatus})});
+        showToast('Статус обновлён');
+        closeDetail();
+        await loadContracts();
+      }catch(e){ showToast(e.message); }
+    });
+  }
+}
+function closeDetail(){
+  document.getElementById('detailOverlay').style.display='none';
+  document.getElementById('detailOverlay').innerHTML='';
+}
+
+init();
+</script>
+</body>
+</html>
