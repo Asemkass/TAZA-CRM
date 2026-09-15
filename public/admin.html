@@ -17,6 +17,7 @@
     <button data-tab="new" class="active">Новый звонок</button>
     <button data-tab="list">Договоры</button>
     <button data-tab="clients">Карта клиента</button>
+    <button data-tab="cash">Касса</button>
     <button data-tab="staff">Сотрудники</button>
   </nav>
 
@@ -116,6 +117,11 @@
     <div id="clientsContainer"></div>
   </section>
 
+  <!-- КАССА -->
+  <section id="view-cash" style="display:none;">
+    <div id="cashStats"></div>
+  </section>
+
   <!-- СОТРУДНИКИ -->
   <section id="view-staff" style="display:none;">
     <div class="card" style="margin-bottom:14px;">
@@ -169,11 +175,12 @@ async function init(){
 
 function switchTab(tab){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
-  ['new','list','clients','staff'].forEach(t=>{
+  ['new','list','clients','cash','staff'].forEach(t=>{
     document.getElementById('view-'+t).style.display = (t===tab)?'block':'none';
   });
   if(tab==='list') renderList();
   if(tab==='clients') loadClients();
+  if(tab==='cash') loadCash();
   if(tab==='staff') renderStaff();
 }
 
@@ -520,6 +527,38 @@ async function openClientCard(id){
     });
     overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
   }catch(e){ showToast(e.message); }
+}
+
+// ---------- Cash ----------
+async function loadCash(){
+  try{
+    const data = await api('/api/contracts/cash-summary');
+    renderCash(data);
+  }catch(e){ showToast(e.message); }
+}
+function renderCash(data){
+  const el = document.getElementById('cashStats');
+  const paymentLabels = {cash:'Наличными', card:'Картой', 'не указано':'Не указано'};
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat"><div class="n">${fmtMoney(data.total)}</div><div class="l">Всего заработано (закрытые договоры)</div></div>
+      <div class="stat"><div class="n">${data.count}</div><div class="l">Закрытых договоров</div></div>
+    </div>
+    ${data.byPayment ? `<div class="stat-row">
+      ${data.byPayment.map(p=>`
+        <div class="stat"><div class="n">${fmtMoney(p.total)}</div>
+        <div class="l">${paymentLabels[p.method]||p.method} (${p.count})</div></div>`).join('')}
+    </div>` : ''}
+    <div class="card">
+      <h1 class="formtitle">По дням</h1>
+      <div class="list">${data.byDay.map(d=>`
+        <div class="item" style="cursor:default;">
+          <div class="row1"><div class="phone">${fmtDate(d.day)}</div>
+          <span class="badge" style="background:var(--teal)">${d.count} дог.</span></div>
+          <div class="row3"><span class="cost">${fmtMoney(d.total)}</span></div>
+        </div>`).join('') || '<div class="empty">Пока нет закрытых договоров</div>'}
+      </div>
+    </div>`;
 }
 
 // ---------- Staff ----------
