@@ -3,21 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Таза · Админ</title>
+<title>КзБлеск · Админ</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><span class="mark">Таза</span><span class="sub">Админ-панель</span></div>
+    <div class="brand"><span class="mark">КзБлеск</span><span class="sub">Админ-панель</span></div>
     <div class="whoami"><span id="whoName"></span><span class="logout-link" onclick="logout()">Выйти</span></div>
   </header>
 
-   <nav class="tabs">
+  <nav class="tabs">
     <button data-tab="new" class="active">Новый звонок</button>
     <button data-tab="list">Договоры</button>
     <button data-tab="clients">Карта клиента</button>
-    <button data-tab="cash">Касса</button>
     <button data-tab="staff">Сотрудники</button>
   </nav>
 
@@ -33,12 +32,12 @@
       <div class="field required">
         <label>Город / район</label>
         <select id="f_city">
-          <option value="">Выберите район</option>
-          <option>Есиль</option><option>Алматы</option><option>Сарыарка</option>
-          <option>Байконур</option><option>Сарайшык</option><option>Нура</option>
+          <option value="">Выберите город</option>
+          <option>Есиль</option><option>Алматы</option><option>Байконур</option>
+          <option>Нура</option><option>Сарыарка</option><option>Основной цех</option><option>Пригород</option>
           <option value="__other">Другой...</option>
         </select>
-        <input id="f_city_other" type="text" placeholder="Введите район" style="margin-top:8px;display:none;">
+        <input id="f_city_other" type="text" placeholder="Введите город" style="margin-top:8px;display:none;">
       </div>
 
       <div class="field required"><label>Адрес</label><input id="f_addr" type="text" placeholder="Улица, дом"></div>
@@ -49,9 +48,14 @@
       </div>
       <div class="field"><label>Кв.</label><input id="f_apt" type="text" placeholder="напр. 24"></div>
 
-      <div class="grid2">
-        <div class="field required"><label>Кол-во ковров</label><input id="f_qty" type="number" min="1"></div>
-        <div class="field"><label>Площадь, м²</label><input id="f_area" type="number" step="0.01"></div>
+      <div class="field required">
+        <label>Ковры (укажите м² каждого коврика)</label>
+        <div id="carpetsList"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="addCarpetBtn" style="margin-top:4px;width:auto;padding:8px 14px;">+ Добавить ковёр</button>
+      </div>
+      <div class="cost-row" style="margin-bottom:18px;">
+        <span class="label">Ковров: <b id="carpetsCountLabel">1</b> · Общая площадь</span>
+        <span class="value" id="totalAreaLabel">0 м²</span>
       </div>
 
       <div class="grid2">
@@ -71,24 +75,27 @@
         <select id="f_courier"><option value="">Не назначен</option></select>
       </div>
 
-           <div class="field" style="display:flex;align-items:center;gap:10px;">
-        <input type="checkbox" id="f_delivery" style="width:auto;">
-        <label for="f_delivery" style="margin:0;">Доставка на дом (+2000 ₸)</label>
-      </div>
-
       <div class="grid2">
-        <div class="field"><label>Цена за м², ₸</label><input id="f_pricem2" type="number"></div>
-        <div class="field required"><label>Стоимость, ₸</label><input id="f_cost" type="number"></div>
+        <div class="field"><label>Цена обычный, ₸/м²</label><input id="f_price_normal" type="number" value="900"></div>
+        <div class="field"><label>Цена с запахом, ₸/м²</label><input id="f_price_smell" type="number" value="1200"></div>
       </div>
 
       <div class="field">
-        <label>Способ оплаты</label>
-        <select id="f_payment">
-          <option value="">Не указано</option>
-          <option value="cash">Наличными</option>
-          <option value="card">Картой</option>
+        <label>Скидка</label>
+        <select id="f_discount">
+          <option value="none">Без скидки</option>
+          <option value="pension">Пенсионная — 10%</option>
+          <option value="promo3plus1">Акция 3+1 (каждый 4-й ковёр бесплатно)</option>
         </select>
       </div>
+
+      <div class="cost-row" id="discountRow" style="margin-bottom:18px;display:none;">
+        <span class="label">Скидка</span>
+        <span class="value" id="discountAmountLabel">0 ₸</span>
+      </div>
+
+      <div class="field required"><label>Стоимость, ₸</label><input id="f_cost" type="number"></div>
+
       <div class="field"><label>Комментарий</label><textarea id="f_comment"></textarea></div>
 
       <button class="btn btn-primary" id="saveBtn">Сохранить договор</button>
@@ -97,6 +104,7 @@
 
   <!-- СПИСОК ДОГОВОРОВ -->
   <section id="view-list" style="display:none;">
+    <div id="statusChips" class="city-chips"></div>
     <div id="cityChips" class="city-chips"></div>
     <div class="search"><input id="searchInput" type="text" placeholder="Поиск по телефону, адресу, имени"></div>
     <div id="listContainer"></div>
@@ -106,11 +114,6 @@
   <section id="view-clients" style="display:none;">
     <div class="search"><input id="clientSearch" type="text" placeholder="Поиск клиента по телефону или имени"></div>
     <div id="clientsContainer"></div>
-  </section>
-
-    <!-- КАССА -->
-  <section id="view-cash" style="display:none;">
-    <div id="cashStats"></div>
   </section>
 
   <!-- СОТРУДНИКИ -->
@@ -139,6 +142,7 @@
 let contracts = [];
 let couriers = [];
 let activeCityFilter = null;
+let activeStatusFilter = null;
 
 async function init(){
   const me = await whoAmI();
@@ -165,12 +169,11 @@ async function init(){
 
 function switchTab(tab){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
-  ['new','list','clients','cash','staff'].forEach(t=>{
+  ['new','list','clients','staff'].forEach(t=>{
     document.getElementById('view-'+t).style.display = (t===tab)?'block':'none';
   });
   if(tab==='list') renderList();
   if(tab==='clients') loadClients();
-  if(tab==='cash') loadCash();
   if(tab==='staff') renderStaff();
 }
 
@@ -180,33 +183,120 @@ function getCityValue(){
   return sel.value==='__other' ? document.getElementById('f_city_other').value.trim() : sel.value;
 }
 
-const DELIVERY_FEE = 2000;
-
 function wireForm(){
-  const area = document.getElementById('f_area');
-  const price = document.getElementById('f_pricem2');
+  const carpetsList = document.getElementById('carpetsList');
+  const priceNormal = document.getElementById('f_price_normal');
+  const priceSmell = document.getElementById('f_price_smell');
+  const discountSelect = document.getElementById('f_discount');
   const cost = document.getElementById('f_cost');
-  const delivery = document.getElementById('f_delivery');
-  const qty = document.getElementById('f_qty');
   let manual = false;
   cost.addEventListener('input', ()=>manual=true);
-  function recalc(){
-    const a=parseFloat(area.value), p=parseFloat(price.value), q=parseFloat(qty.value) || 1;
-    if(!isNaN(a)&&!isNaN(p)&&!manual) cost.value = Math.round(a*p*q + (delivery.checked?DELIVERY_FEE:0));
+
+  function carpetRow(value, type){
+    const row = document.createElement('div');
+    row.className = 'carpet-row';
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;';
+    row.innerHTML = `
+      <span style="min-width:78px;color:var(--muted);font-size:13px;" data-carpet-label></span>
+      <input type="number" step="0.01" min="0" class="carpet-area" placeholder="м²" style="flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:15px;">
+      <select class="carpet-type" style="flex:1;min-width:140px;border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:14px;">
+        <option value="normal">Обычный</option>
+        <option value="smell">С сильным запахом</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-carpet style="width:auto;padding:8px 12px;">✕</button>`;
+    if(value!==undefined) row.querySelector('.carpet-area').value = value;
+    if(type) row.querySelector('.carpet-type').value = type;
+    row.querySelector('.carpet-area').addEventListener('input', recalc);
+    row.querySelector('.carpet-type').addEventListener('change', recalc);
+    row.querySelector('[data-remove-carpet]').addEventListener('click', ()=>{
+      if(carpetsList.children.length <= 1) return; // всегда минимум один ковёр
+      row.remove();
+      renumberCarpets();
+      recalc();
+    });
+    return row;
   }
-  area.addEventListener('input', recalc);
-  price.addEventListener('input', recalc);
-  delivery.addEventListener('change', recalc);
-  qty.addEventListener('input', recalc);
+  function addCarpetRow(value, type){
+    carpetsList.appendChild(carpetRow(value, type));
+    renumberCarpets();
+    recalc();
+  }
+  function renumberCarpets(){
+    [...carpetsList.children].forEach((row, i)=>{
+      row.querySelector('[data-carpet-label]').textContent = `Ковёр ${i+1}`;
+    });
+  }
+  function resetCarpets(){
+    carpetsList.innerHTML = '';
+    addCarpetRow();
+  }
+  function getCarpets(){
+    return [...carpetsList.children].map(row=>({
+      area: parseFloat(row.querySelector('.carpet-area').value),
+      type: row.querySelector('.carpet-type').value
+    })).filter(c=>!isNaN(c.area) && c.area>0);
+  }
+  // Возвращает { rawTotal, finalTotal, discountAmount, discountLabel }
+  function computeCost(){
+    const carpetsData = getCarpets();
+    const pn = parseFloat(priceNormal.value) || 0;
+    const ps = parseFloat(priceSmell.value) || 0;
+    const itemCosts = carpetsData.map(c => c.area * (c.type==='smell' ? ps : pn));
+    const rawTotal = itemCosts.reduce((s,v)=>s+v, 0);
+    const discount = discountSelect.value;
+    let finalTotal = rawTotal, discountAmount = 0, discountLabel = '';
+
+    if(discount === 'pension'){
+      discountAmount = rawTotal * 0.10;
+      finalTotal = rawTotal - discountAmount;
+      discountLabel = 'Пенсионная скидка 10%';
+    } else if(discount === 'promo3plus1'){
+      const n = itemCosts.length;
+      const freeCount = Math.floor(n / 4);
+      if(freeCount > 0){
+        const sorted = [...itemCosts].sort((a,b)=>a-b); // бесплатным идёт самый дешёвый ковёр
+        discountAmount = sorted.slice(0, freeCount).reduce((s,v)=>s+v, 0);
+        finalTotal = rawTotal - discountAmount;
+        discountLabel = `Акция 3+1: бесплатно ${freeCount} ковёр(ов)`;
+      }
+    }
+    return { totalArea: carpetsData.reduce((s,c)=>s+c.area,0), rawTotal, finalTotal, discountAmount, discountLabel };
+  }
+  function recalc(){
+    const r = computeCost();
+    document.getElementById('carpetsCountLabel').textContent = carpetsList.children.length;
+    document.getElementById('totalAreaLabel').textContent = r.totalArea.toFixed(2).replace(/\.00$/,'') + ' м²';
+    const discountRow = document.getElementById('discountRow');
+    if(r.discountAmount > 0){
+      discountRow.style.display = 'flex';
+      document.getElementById('discountAmountLabel').textContent = '−' + fmtMoney(Math.round(r.discountAmount));
+    } else {
+      discountRow.style.display = 'none';
+    }
+    if(r.totalArea>0 && !manual) cost.value = Math.round(r.finalTotal);
+  }
+
+  document.getElementById('addCarpetBtn').addEventListener('click', ()=>addCarpetRow());
+  priceNormal.addEventListener('input', recalc);
+  priceSmell.addEventListener('input', recalc);
+  discountSelect.addEventListener('change', recalc);
+  resetCarpets();
 
   document.getElementById('saveBtn').addEventListener('click', async ()=>{
     const phone = document.getElementById('f_phone').value.trim();
     const city = getCityValue();
     const addr = document.getElementById('f_addr').value.trim();
-    const qty = document.getElementById('f_qty').value;
+    const carpetsData = getCarpets();
+    const qty = carpetsList.children.length;
+    const r = computeCost();
     const date = document.getElementById('f_date').value;
     const costVal = document.getElementById('f_cost').value;
     if(!phone||!city||!addr||!qty||!date||!costVal){ showToast('Заполните обязательные поля (*)'); return; }
+
+    const hasSmell = carpetsData.some(c=>c.type==='smell');
+    const commentParts = [document.getElementById('f_comment').value.trim()];
+    if(hasSmell) commentParts.unshift('С сильным запахом: ' + carpetsData.filter(c=>c.type==='smell').map(c=>c.area+'м²').join(', '));
+    if(r.discountLabel) commentParts.unshift(r.discountLabel);
 
     try{
       await api('/api/contracts', {method:'POST', body: JSON.stringify({
@@ -215,24 +305,23 @@ function wireForm(){
         apartment: document.getElementById('f_apt').value,
         entrance: document.getElementById('f_entrance').value,
         floor: document.getElementById('f_floor').value,
-        qty_carpets: qty, area: area.value || null,
-        price_per_m2: price.value || null, cost: costVal,
+        qty_carpets: qty, area: r.totalArea || null,
+        price_per_m2: priceNormal.value || null, cost: costVal,
         status: document.getElementById('f_status').value,
         assigned_courier_id: document.getElementById('f_courier').value || null,
-                contract_date: date, comment: document.getElementById('f_comment').value.trim(),
-        payment_method: document.getElementById('f_payment').value || null
+        contract_date: date, comment: commentParts.filter(Boolean).join(' | ')
       })});
       showToast('Договор сохранён');
-      ['f_phone','f_name','f_addr','f_entrance','f_floor','f_apt','f_qty','f_area','f_pricem2','f_cost','f_comment','f_city_other']
+      ['f_phone','f_name','f_addr','f_entrance','f_floor','f_apt','f_cost','f_comment','f_city_other']
         .forEach(id=>document.getElementById(id).value='');
-       document.getElementById('f_delivery').checked = false;
-        document.getElementById('f_payment').value = '';
-       document.getElementById('f_city').value='';
+      document.getElementById('f_city').value='';
       document.getElementById('f_city_other').style.display='none';
       document.getElementById('f_status').value='new_call';
       document.getElementById('f_courier').value='';
+      document.getElementById('f_discount').value='none';
       document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
       manual=false;
+      resetCarpets();
       await loadContracts();
       switchTab('list');
     }catch(e){ showToast(e.message); }
@@ -258,15 +347,30 @@ function renderCityChips(){
   });
 }
 
+function renderStatusChips(){
+  const el = document.getElementById('statusChips');
+  const counts = {};
+  contracts.forEach(c=>{ counts[c.status] = (counts[c.status]||0)+1; });
+  el.innerHTML = `<button class="chip ${!activeStatusFilter?'active':''}" data-status="">Все статусы (${contracts.length})</button>` +
+    Object.entries(STATUS_META).map(([k,v])=>
+      `<button class="chip ${activeStatusFilter===k?'active':''}" data-status="${k}" style="${activeStatusFilter===k?`background:${v.color};border-color:${v.color};`:''}">${v.label} (${counts[k]||0})</button>`
+    ).join('');
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{ activeStatusFilter = chip.dataset.status || null; renderList(); });
+  });
+}
+
 function renderList(){
+  renderStatusChips();
   renderCityChips();
   const container = document.getElementById('listContainer');
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const filtered = contracts.filter(c=>{
+    const matchesStatus = !activeStatusFilter || c.status===activeStatusFilter;
     const matchesCity = !activeCityFilter || (c.city||'Без города')===activeCityFilter;
     const matchesQ = !q || (c.client_phone||'').toLowerCase().includes(q) ||
       (c.address||'').toLowerCase().includes(q) || (c.client_name||'').toLowerCase().includes(q);
-    return matchesCity && matchesQ;
+    return matchesStatus && matchesCity && matchesQ;
   });
   if(filtered.length===0){
     container.innerHTML = `<div class="empty"><div class="big">🧺</div><div class="t">${contracts.length===0?'Пока нет договоров':'Ничего не найдено'}</div></div>`;
@@ -278,10 +382,10 @@ function renderList(){
 
 function cardHtml(c){
   const meta = STATUS_META[c.status]||STATUS_META.new_call;
-  const loc = [c.floor?`эт. ${c.floor}`:null, c.apartment?`кв. ${c.apartment}`:null].filter(Boolean).join(', ');
+  const loc = [c.entrance?`под. ${c.entrance}`:null, c.floor?`эт. ${c.floor}`:null, c.apartment?`кв. ${c.apartment}`:null].filter(Boolean).join(', ');
   return `<div class="item" data-id="${c.id}">
     <div class="row1">
-      <div><div class="phone">${escapeHtml(c.client_phone||'—')}</div>
+      <div><div class="phone">№${c.id} · ${escapeHtml(c.client_phone||'—')}</div>
       <div class="addr">${c.city?escapeHtml(c.city)+' · ':''}${escapeHtml(c.address)}${loc?' · '+loc:''}</div></div>
       <span class="badge" style="background:${meta.color}">${meta.label}</span>
     </div>
@@ -306,26 +410,60 @@ function openDetail(id){
         ${couriers.map(u=>`<option value="${u.id}" ${u.id===c.assigned_courier_id?'selected':''}>${escapeHtml(u.full_name)}</option>`).join('')}
       </select>
     </div>
-        <div class="field"><label>Стоимость, ₸</label><input id="editCost" type="number" value="${c.cost}"></div>
-    <div class="field"><label>Способ оплаты</label>
-      <select id="editPayment">
-        <option value="" ${!c.payment_method?'selected':''}>Не указано</option>
-        <option value="cash" ${c.payment_method==='cash'?'selected':''}>Наличными</option>
-        <option value="card" ${c.payment_method==='card'?'selected':''}>Картой</option>
-      </select>
+    <div class="field"><label>Стоимость, ₸</label><input id="editCost" type="number" value="${c.cost}"></div>
+    <div class="field">
+      <label>Скидка (применяется к текущей сумме выше)</label>
+      <div style="display:flex;gap:8px;">
+        <select id="editDiscount" style="flex:1;">
+          <option value="none">Выбрать скидку...</option>
+          <option value="pension">Пенсионная — 10%</option>
+          <option value="promo3plus1">Акция 3+1 (по кол-ву ковров: ${c.qty_carpets||1})</option>
+        </select>
+        <button type="button" class="btn btn-ghost btn-sm" id="applyDiscountBtn" style="width:auto;padding:11px 16px;">Применить</button>
+      </div>
+      <p class="formhint" style="margin:6px 0 0;">Применяйте один раз — повторное применение посчитает скидку от уже сниженной суммы.</p>
     </div>
+    <div class="field"><label>Комментарий</label><textarea id="editComment">${escapeHtml(c.comment||'')}</textarea></div>
     <button class="btn btn-primary" id="saveDetailBtn" style="margin-bottom:10px;">Сохранить изменения</button>
     <button class="btn btn-ghost" id="deleteBtn">Удалить договор</button>
   </div>`;
   document.getElementById('closeDetail').addEventListener('click', closeDetail);
   overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
+  document.getElementById('applyDiscountBtn').addEventListener('click', ()=>{
+    const discount = document.getElementById('editDiscount').value;
+    const editCost = document.getElementById('editCost');
+    const raw = parseFloat(editCost.value) || 0;
+    const qty = c.qty_carpets || 1;
+    let discounted = raw, label = '';
+    if(discount === 'pension'){
+      discounted = raw * 0.9;
+      label = 'Пенсионная скидка 10%';
+    } else if(discount === 'promo3plus1'){
+      const freeCount = Math.floor(qty / 4);
+      if(freeCount > 0){
+        const perCarpet = raw / qty;
+        discounted = raw - perCarpet * freeCount;
+        label = `Акция 3+1: бесплатно ${freeCount} ковёр(ов)`;
+      } else {
+        showToast('Для акции 3+1 нужно минимум 4 ковра в этом договоре');
+        return;
+      }
+    } else {
+      showToast('Выберите скидку из списка');
+      return;
+    }
+    editCost.value = Math.round(discounted);
+    const commentEl = document.getElementById('editComment');
+    commentEl.value = [label, commentEl.value].filter(Boolean).join(' | ');
+    showToast('Скидка применена — не забудьте нажать "Сохранить изменения"');
+  });
   document.getElementById('saveDetailBtn').addEventListener('click', async ()=>{
     try{
-            await api(`/api/contracts/${c.id}`, {method:'PATCH', body: JSON.stringify({
+      await api(`/api/contracts/${c.id}`, {method:'PATCH', body: JSON.stringify({
         status: document.getElementById('editStatus').value,
         assigned_courier_id: document.getElementById('editCourier').value || null,
         cost: document.getElementById('editCost').value,
-        payment_method: document.getElementById('editPayment').value || null
+        comment: document.getElementById('editComment').value
       })});
       showToast('Изменения сохранены');
       closeDetail(); await loadContracts();
@@ -368,35 +506,20 @@ async function openClientCard(id){
       <div class="sheet-head"><h2>${escapeHtml(client.phone)}</h2><button class="close-x" id="closeDetail">✕</button></div>
       <p class="formhint">${escapeHtml(client.name||'Имя не указано')} · Первое обращение: ${fmtDate(client.first_contact)}</p>
       <div class="list">${client.contracts.map(cardHtml).join('') || '<div class="empty">Нет договоров</div>'}</div>
+      <button class="btn btn-ghost" id="deleteClientBtn" style="margin-top:16px;">Удалить клиента</button>
     </div>`;
     document.getElementById('closeDetail').addEventListener('click', closeDetail);
+    document.getElementById('deleteClientBtn').addEventListener('click', async ()=>{
+      if(!confirm('Удалить этого клиента? Договоры останутся, но перестанут быть привязаны к клиенту.')) return;
+      try{
+        await api(`/api/clients/${id}`, {method:'DELETE'});
+        showToast('Клиент удалён');
+        closeDetail();
+        await loadClients();
+      }catch(err){ showToast(err.message); }
+    });
     overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
   }catch(e){ showToast(e.message); }
-}
-// ---------- Cash ----------
-async function loadCash(){
-  try{
-    const data = await api('/api/contracts/cash-summary');
-    renderCash(data);
-  }catch(e){ showToast(e.message); }
-}
-function renderCash(data){
-  const el = document.getElementById('cashStats');
-  el.innerHTML = `
-    <div class="stat-row">
-      <div class="stat"><div class="n">${fmtMoney(data.total)}</div><div class="l">Всего заработано (закрытые договоры)</div></div>
-      <div class="stat"><div class="n">${data.count}</div><div class="l">Закрытых договоров</div></div>
-    </div>
-    <div class="card">
-      <h1 class="formtitle">По дням</h1>
-      <div class="list">${data.byDay.map(d=>`
-        <div class="item" style="cursor:default;">
-          <div class="row1"><div class="phone">${fmtDate(d.day)}</div>
-          <span class="badge" style="background:var(--teal)">${d.count} дог.</span></div>
-          <div class="row3"><span class="cost">${fmtMoney(d.total)}</span></div>
-        </div>`).join('') || '<div class="empty">Пока нет закрытых договоров</div>'}
-      </div>
-    </div>`;
 }
 
 // ---------- Staff ----------
