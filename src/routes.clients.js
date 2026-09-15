@@ -44,4 +44,10 @@ router.get('/:id', async (req, res) => {
   res.json({ ...client, contracts });
 });
 
+// DELETE /api/clients/:id — удалить клиента (admin only)
+router.delete('/:id', async (req, res) => {
+  await pool.query('delete from clients where id = $1', [req.params.id]);
+  res.json({ ok: true });
+});
+
 module.exports = router;
