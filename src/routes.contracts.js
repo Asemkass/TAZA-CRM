@@ -53,8 +53,9 @@ router.post('/', requireRole('admin'), async (req, res) => {
   const {
     phone, client_name, city, address, apartment, entrance, floor,
     qty_carpets, area, price_per_m2, cost, status, assigned_courier_id,
-    contract_date, comment, payment_method
+    contract_date, comment
   } = req.body;
+
   if (!phone || !address || !qty_carpets || !cost) {
     return res.status(400).json({ error: 'Заполните обязательные поля: телефон, адрес, кол-во ковров, стоимость' });
   }
@@ -73,12 +74,12 @@ router.post('/', requireRole('admin'), async (req, res) => {
   const { rows } = await pool.query(
     `insert into contracts
       (client_id, city, address, apartment, entrance, floor, qty_carpets, area,
-       price_per_m2, cost, status, assigned_courier_id, contract_date, comment, payment_method, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       price_per_m2, cost, status, assigned_courier_id, contract_date, comment, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      returning *`,
     [client.id, city, address, apartment, entrance, floor, qty_carpets, area,
      price_per_m2, cost, status || 'new_call', assigned_courier_id || null,
-     contract_date || new Date(), comment || null, payment_method || null, req.user.id]
+     contract_date || new Date(), comment || null, req.user.id]
   );
 
   res.status(201).json(rows[0]);
@@ -106,8 +107,8 @@ router.patch('/:id', async (req, res) => {
   }
 
   // admin: обновление любых полей
-    const fields = ['city','address','apartment','entrance','floor','qty_carpets','area',
-    'price_per_m2','cost','status','assigned_courier_id','contract_date','comment','payment_method'];
+  const fields = ['city','address','apartment','entrance','floor','qty_carpets','area',
+    'price_per_m2','cost','status','assigned_courier_id','contract_date','comment'];
   const sets = [];
   const params = [];
   fields.forEach(f => {
@@ -129,30 +130,6 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', requireRole('admin'), async (req, res) => {
   await pool.query('delete from contracts where id = $1', [req.params.id]);
   res.json({ ok: true });
-});
-
-// GET /api/contracts/cash-summary — касса: сумма закрытых договоров (admin only)
-router.get('/cash-summary', requireRole('admin'), async (req, res) => {
-  const totalRes = await pool.query(
-    `select coalesce(sum(cost),0) as total, count(*) as count
-     from contracts where status = 'closed'`
-  );
-  const byDayRes = await pool.query(
-    `select contract_date::date as day, coalesce(sum(cost),0) as total, count(*) as count
-     from contracts where status = 'closed'
-     group by day order by day desc limit 30`
-  );
-  const byPaymentRes = await pool.query(
-    `select coalesce(payment_method,'не указано') as method, coalesce(sum(cost),0) as total, count(*) as count
-     from contracts where status = 'closed'
-     group by method`
-  );
-  res.json({
-    total: totalRes.rows[0].total,
-    count: totalRes.rows[0].count,
-    byDay: byDayRes.rows,
-    byPayment: byPaymentRes.rows
-  });
 });
 
 module.exports = router;
