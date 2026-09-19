@@ -407,8 +407,41 @@ function openDetail(id){
   if(!c) return;
   const overlay = document.getElementById('detailOverlay');
   overlay.style.display='flex';
+  const cityOptions = ['Есиль','Алматы','Байконур','Нура','Сарыарка','Основной цех','Пригород'];
+  const isKnownCity = cityOptions.includes(c.city);
   overlay.innerHTML = `<div class="sheet">
-    <div class="sheet-head"><h2>${escapeHtml(c.client_phone)}</h2><button class="close-x" id="closeDetail">✕</button></div>
+    <div class="sheet-head"><h2>№${c.id} · ${escapeHtml(c.client_phone)}</h2><button class="close-x" id="closeDetail">✕</button></div>
+
+    <div class="field"><label>Город / район</label>
+      <select id="editCity">
+        <option value="">Выберите город</option>
+        ${cityOptions.map(city=>`<option value="${city}" ${c.city===city?'selected':''}>${city}</option>`).join('')}
+        <option value="__other" ${!isKnownCity && c.city ? 'selected':''}>Другой...</option>
+      </select>
+      <input id="editCityOther" type="text" placeholder="Введите город" value="${!isKnownCity ? escapeHtml(c.city||'') : ''}" style="margin-top:8px;${!isKnownCity && c.city ? '':'display:none;'}">
+    </div>
+    <div class="field"><label>Адрес</label><input id="editAddr" type="text" value="${escapeHtml(c.address||'')}"></div>
+    <div class="grid2">
+      <div class="field"><label>Подъезд</label><input id="editEntrance" type="text" value="${escapeHtml(c.entrance||'')}"></div>
+      <div class="field"><label>Этаж</label><input id="editFloor" type="number" value="${escapeHtml(c.floor||'')}"></div>
+    </div>
+    <div class="field"><label>Кв.</label><input id="editApt" type="text" value="${escapeHtml(c.apartment||'')}"></div>
+
+    <div class="field">
+      <label>Ковры (м² каждого коврика)</label>
+      <div id="editCarpetsList"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="editAddCarpetBtn" style="margin-top:4px;width:auto;padding:8px 14px;">+ Добавить ковёр</button>
+    </div>
+    <div class="cost-row" style="margin-bottom:14px;">
+      <span class="label">Ковров: <b id="editCarpetsCountLabel">${c.qty_carpets||1}</b> · Общая площадь</span>
+      <span class="value" id="editTotalAreaLabel">${c.area||0} м²</span>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Цена обычный, ₸/м²</label><input id="editPriceNormal" type="number" value="${c.price_per_m2||900}"></div>
+      <div class="field"><label>Цена с запахом, ₸/м²</label><input id="editPriceSmell" type="number" value="1200"></div>
+    </div>
+    <p class="formhint" style="margin-top:-8px;">Изменение ковров/цен пересчитает стоимость ниже (если она не была изменена вручную).</p>
+
     <div class="field"><label>Статус</label>
       <select id="editStatus">${Object.entries(STATUS_META).map(([k,v])=>`<option value="${k}" ${k===c.status?'selected':''}>${v.label}</option>`).join('')}</select>
     </div>
@@ -436,11 +469,79 @@ function openDetail(id){
   </div>`;
   document.getElementById('closeDetail').addEventListener('click', closeDetail);
   overlay.addEventListener('click', e=>{ if(e.target===overlay) closeDetail(); });
+
+  document.getElementById('editCity').addEventListener('change', e=>{
+    document.getElementById('editCityOther').style.display = e.target.value==='__other' ? 'block':'none';
+  });
+
+  // ---- Редактирование ковров по отдельности ----
+  const editCarpetsList = document.getElementById('editCarpetsList');
+  const editPriceNormal = document.getElementById('editPriceNormal');
+  const editPriceSmell = document.getElementById('editPriceSmell');
+  const editCost = document.getElementById('editCost');
+  let editCostManual = false;
+  editCost.addEventListener('input', ()=>editCostManual=true);
+
+  function editCarpetRow(value, type){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;';
+    row.innerHTML = `
+      <span style="min-width:78px;color:var(--muted);font-size:13px;" data-carpet-label></span>
+      <input type="number" step="0.01" min="0" class="edit-carpet-area" placeholder="м²" style="flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:15px;">
+      <select class="edit-carpet-type" style="flex:1;min-width:140px;border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:14px;">
+        <option value="normal">Обычный</option>
+        <option value="smell">С сильным запахом</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-carpet style="width:auto;padding:8px 12px;">✕</button>`;
+    if(value!==undefined) row.querySelector('.edit-carpet-area').value = value;
+    if(type) row.querySelector('.edit-carpet-type').value = type;
+    row.querySelector('.edit-carpet-area').addEventListener('input', editRecalc);
+    row.querySelector('.edit-carpet-type').addEventListener('change', editRecalc);
+    row.querySelector('[data-remove-carpet]').addEventListener('click', ()=>{
+      if(editCarpetsList.children.length <= 1) return;
+      row.remove();
+      editRenumber();
+      editRecalc();
+    });
+    return row;
+  }
+  function editRenumber(){
+    [...editCarpetsList.children].forEach((row,i)=>{ row.querySelector('[data-carpet-label]').textContent = `Ковёр ${i+1}`; });
+  }
+  function editGetCarpets(){
+    return [...editCarpetsList.children].map(row=>({
+      area: parseFloat(row.querySelector('.edit-carpet-area').value),
+      type: row.querySelector('.edit-carpet-type').value
+    })).filter(x=>!isNaN(x.area) && x.area>0);
+  }
+  function editRecalc(){
+    const data = editGetCarpets();
+    const totalArea = data.reduce((s,x)=>s+x.area,0);
+    document.getElementById('editCarpetsCountLabel').textContent = editCarpetsList.children.length;
+    document.getElementById('editTotalAreaLabel').textContent = totalArea.toFixed(2).replace(/\.00$/,'') + ' м²';
+    const pn = parseFloat(editPriceNormal.value)||0, ps = parseFloat(editPriceSmell.value)||0;
+    const totalCost = data.reduce((s,x)=> s + x.area*(x.type==='smell'?ps:pn), 0);
+    if(totalArea>0 && !editCostManual) editCost.value = Math.round(totalCost);
+  }
+
+  // Заполняем стартовые строки: делим текущую общую площадь поровну между известным кол-вом ковров
+  const startQty = c.qty_carpets || 1;
+  const startArea = c.area ? (parseFloat(c.area) / startQty) : '';
+  for(let i=0;i<startQty;i++){ editCarpetsList.appendChild(editCarpetRow(startArea ? Math.round(startArea*100)/100 : undefined)); }
+  editRenumber();
+  document.getElementById('editAddCarpetBtn').addEventListener('click', ()=>{
+    editCarpetsList.appendChild(editCarpetRow());
+    editRenumber();
+    editRecalc();
+  });
+  editPriceNormal.addEventListener('input', editRecalc);
+  editPriceSmell.addEventListener('input', editRecalc);
+
   document.getElementById('applyDiscountBtn').addEventListener('click', ()=>{
     const discount = document.getElementById('editDiscount').value;
-    const editCost = document.getElementById('editCost');
-    const raw = parseFloat(editCost.value) || 0;
-    const qty = c.qty_carpets || 1;
+    const editCostEl = document.getElementById('editCost');
+    const raw = parseFloat(editCostEl.value) || 0;
+    const qty = editCarpetsList.children.length || 1;
     let discounted = raw, label = '';
     if(discount === 'pension'){
       discounted = raw * 0.9;
@@ -465,8 +566,21 @@ function openDetail(id){
     showToast('Скидка применена — не забудьте нажать "Сохранить изменения"');
   });
   document.getElementById('saveDetailBtn').addEventListener('click', async ()=>{
+    const cityVal = document.getElementById('editCity').value==='__other'
+      ? document.getElementById('editCityOther').value.trim()
+      : document.getElementById('editCity').value;
+    const carpetsData = editGetCarpets();
+    const totalArea = carpetsData.reduce((s,x)=>s+x.area,0);
     try{
       await api(`/api/contracts/${c.id}`, {method:'PATCH', body: JSON.stringify({
+        city: cityVal,
+        address: document.getElementById('editAddr').value.trim(),
+        entrance: document.getElementById('editEntrance').value,
+        floor: document.getElementById('editFloor').value,
+        apartment: document.getElementById('editApt').value,
+        qty_carpets: editCarpetsList.children.length,
+        area: totalArea || null,
+        price_per_m2: editPriceNormal.value || null,
         status: document.getElementById('editStatus').value,
         assigned_courier_id: document.getElementById('editCourier').value || null,
         cost: document.getElementById('editCost').value,
