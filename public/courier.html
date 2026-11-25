@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Таза · Мои заявки</title>
+<title>КзБлеск · Мои заявки</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><span class="mark">Таза</span><span class="sub">Мои заявки</span></div>
+    <div class="brand"><span class="mark">КзБлеск</span><span class="sub">Мои заявки</span></div>
     <div class="whoami"><span id="whoName"></span><span class="logout-link" onclick="logout()">Выйти</span></div>
   </header>
   <section>
@@ -69,7 +69,6 @@ function cardHtml(c){
       </div>
       <div class="row2"><span>Ковров: <b>${escapeHtml(c.qty_carpets)}</b></span></div>
       <div class="row3">
-        <span class="cost">${fmtMoney(c.cost)}</span>
         <span class="date">${fmtDate(c.contract_date)}</span>
       </div>
     </div>`;
