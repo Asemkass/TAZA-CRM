@@ -6,6 +6,25 @@ const router = express.Router();
 router.use(requireAuth);
 
 const STATUSES = ['new_call', 'pickup', 'wash', 'delivery', 'closed'];
+const CARPET_TYPES = ['normal', 'smell'];
+
+// Проверка списка ковров [{area, type}]. Возвращает { value } или { error }.
+function parseCarpets(v) {
+  if (v === undefined || v === null) return { value: null };
+  if (!Array.isArray(v) || v.length === 0 || v.length > 200) {
+    return { error: 'Некорректный список ковров' };
+  }
+  const out = [];
+  for (const x of v) {
+    const area = Number(x && x.area);
+    const type = x && x.type;
+    if (!(area > 0) || !isFinite(area) || !CARPET_TYPES.includes(type)) {
+      return { error: 'Некорректные данные ковра (площадь или тип)' };
+    }
+    out.push({ area, type });
+  }
+  return { value: out };
+}
 
 // GET /api/contracts
 // admin -> все договоры (с фильтром по городу/статусу/поиску)
@@ -45,6 +64,13 @@ router.get('/', async (req, res) => {
      order by c.created_at desc`,
     params
   );
+  if (req.user.role === 'courier') {
+    // деньги и состав ковров курьеру не отдаём (проверка на сервере)
+    rows.forEach(r => {
+      delete r.cost; delete r.price_per_m2; delete r.price_smell;
+      delete r.carpets; delete r.area;
+    });
+  }
   res.json(rows);
 });
 
@@ -52,12 +78,14 @@ router.get('/', async (req, res) => {
 router.post('/', requireRole('admin'), async (req, res) => {
   const {
     phone, client_name, city, address, apartment, entrance, floor,
-    qty_carpets, area, price_per_m2, cost, status, assigned_courier_id,
+    qty_carpets, area, price_per_m2, price_smell, carpets, cost, status, assigned_courier_id,
     contract_date, comment, payment_method
   } = req.body;
   if (!phone || !address || !qty_carpets || !cost) {
     return res.status(400).json({ error: 'Заполните обязательные поля: телефон, адрес, кол-во ковров, стоимость' });
   }
+  const parsedCarpets = parseCarpets(carpets);
+  if (parsedCarpets.error) return res.status(400).json({ error: parsedCarpets.error });
 
   // найти или создать клиента
   let client = (await pool.query('select id from clients where phone = $1', [phone])).rows[0];
@@ -73,11 +101,14 @@ router.post('/', requireRole('admin'), async (req, res) => {
   const { rows } = await pool.query(
     `insert into contracts
       (client_id, city, address, apartment, entrance, floor, qty_carpets, area,
-       price_per_m2, cost, status, assigned_courier_id, contract_date, comment, payment_method, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       price_per_m2, price_smell, carpets, cost, status, assigned_courier_id,
+       contract_date, comment, payment_method, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
      returning *`,
     [client.id, city, address, apartment, entrance, floor, qty_carpets, area,
-     price_per_m2, cost, status || 'new_call', assigned_courier_id || null,
+     price_per_m2, price_smell || null,
+     parsedCarpets.value ? JSON.stringify(parsedCarpets.value) : null,
+     cost, status || 'new_call', assigned_courier_id || null,
      contract_date || new Date(), comment || null, payment_method || null, req.user.id]
   );
 
@@ -106,16 +137,22 @@ router.patch('/:id', async (req, res) => {
   }
 
   // admin: обновление любых полей
-    const fields = ['city','address','apartment','entrance','floor','qty_carpets','area',
-    'price_per_m2','cost','status','assigned_courier_id','contract_date','comment','payment_method'];
+  const fields = ['city','address','apartment','entrance','floor','qty_carpets','area',
+    'price_per_m2','price_smell','carpets','cost','status','assigned_courier_id',
+    'contract_date','comment','payment_method'];
   const sets = [];
   const params = [];
-  fields.forEach(f => {
-    if (req.body[f] !== undefined) {
-      params.push(req.body[f]);
-      sets.push(`${f} = $${params.length}`);
+  for (const f of fields) {
+    if (req.body[f] === undefined) continue;
+    let val = req.body[f];
+    if (f === 'carpets') {
+      const parsed = parseCarpets(val);
+      if (parsed.error) return res.status(400).json({ error: parsed.error });
+      val = parsed.value ? JSON.stringify(parsed.value) : null;
     }
-  });
+    params.push(val);
+    sets.push(`${f} = $${params.length}`);
+  }
   if (sets.length === 0) return res.status(400).json({ error: 'Нет данных для обновления' });
   params.push(id);
   const { rows } = await pool.query(
