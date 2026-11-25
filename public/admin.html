@@ -150,6 +150,17 @@ let couriers = [];
 let activeCityFilter = null;
 let activeStatusFilter = null;
 
+// Акция 3+1: items = [{n: номер ковра, area, cost}]. Бесплатными идут самые дешёвые по стоимости.
+// Возвращает сумму скидки и метку с номерами и площадями бесплатных ковров.
+function freeCarpets(items, freeCount){
+  const free = [...items].sort((a,b)=> a.cost - b.cost || a.n - b.n).slice(0, freeCount);
+  const list = free.map(x=>`№${x.n} (${Number(x.area.toFixed(2))} м²)`).join(', ');
+  return {
+    sum: free.reduce((s,x)=>s+x.cost, 0),
+    label: `Акция 3+1: бесплатно ${free.length===1?'ковёр':'ковры'} ${list}`
+  };
+}
+
 async function init(){
   const me = await whoAmI();
   if(!me) return;
@@ -243,9 +254,17 @@ function wireForm(){
       type: row.querySelector('.carpet-type').value
     })).filter(c=>!isNaN(c.area) && c.area>0);
   }
+  // то же, но с номером строки (для подписи, какой ковёр бесплатный)
+  function getCarpetsNumbered(){
+    return [...carpetsList.children].map((row,i)=>({
+      n: i+1,
+      area: parseFloat(row.querySelector('.carpet-area').value),
+      type: row.querySelector('.carpet-type').value
+    })).filter(c=>!isNaN(c.area) && c.area>0);
+  }
   // Возвращает { rawTotal, finalTotal, discountAmount, discountLabel }
   function computeCost(){
-    const carpetsData = getCarpets();
+    const carpetsData = getCarpetsNumbered();
     const pn = parseFloat(priceNormal.value) || 0;
     const ps = parseFloat(priceSmell.value) || 0;
     const itemCosts = carpetsData.map(c => c.area * (c.type==='smell' ? ps : pn));
@@ -261,10 +280,10 @@ function wireForm(){
       const n = itemCosts.length;
       const freeCount = Math.floor(n / 4);
       if(freeCount > 0){
-        const sorted = [...itemCosts].sort((a,b)=>a-b); // бесплатным идёт самый дешёвый ковёр
-        discountAmount = sorted.slice(0, freeCount).reduce((s,v)=>s+v, 0);
+        const f = freeCarpets(carpetsData.map((c,i)=>({n:c.n, area:c.area, cost:itemCosts[i]})), freeCount);
+        discountAmount = f.sum;
         finalTotal = rawTotal - discountAmount;
-        discountLabel = `Акция 3+1: бесплатно ${freeCount} ковёр(ов)`;
+        discountLabel = f.label;
       }
     }
     return { totalArea: carpetsData.reduce((s,c)=>s+c.area,0), rawTotal, finalTotal, discountAmount, discountLabel };
@@ -313,7 +332,8 @@ function wireForm(){
         entrance: document.getElementById('f_entrance').value,
         floor: document.getElementById('f_floor').value,
         qty_carpets: qty, area: r.totalArea || null,
-        price_per_m2: priceNormal.value || null, cost: costVal,
+        price_per_m2: priceNormal.value || null, price_smell: priceSmell.value || null,
+        carpets: carpetsData, cost: costVal,
         status: document.getElementById('f_status').value,
         assigned_courier_id: document.getElementById('f_courier').value || null,
         contract_date: date, comment: commentParts.filter(Boolean).join(' | ')
@@ -436,9 +456,10 @@ function openDetail(id){
       <span class="label">Ковров: <b id="editCarpetsCountLabel">${c.qty_carpets||1}</b> · Общая площадь</span>
       <span class="value" id="editTotalAreaLabel">${c.area||0} м²</span>
     </div>
+    <p class="formhint" id="legacyCarpetsHint" style="display:none;margin-top:-8px;color:#b45309;">Это старый договор: площади отдельных ковров не сохранялись, поэтому показана средняя. Общая площадь и стоимость верные. Чтобы указать реальные площади, введите их вручную.</p>
     <div class="grid2">
       <div class="field"><label>Цена обычный, ₸/м²</label><input id="editPriceNormal" type="number" value="${c.price_per_m2||900}"></div>
-      <div class="field"><label>Цена с запахом, ₸/м²</label><input id="editPriceSmell" type="number" value="1200"></div>
+      <div class="field"><label>Цена с запахом, ₸/м²</label><input id="editPriceSmell" type="number" value="${c.price_smell||1200}"></div>
     </div>
     <p class="formhint" style="margin-top:-8px;">Изменение ковров/цен пересчитает стоимость ниже (если она не была изменена вручную).</p>
 
@@ -452,16 +473,13 @@ function openDetail(id){
     </div>
     <div class="field"><label>Стоимость, ₸</label><input id="editCost" type="number" value="${c.cost}"></div>
     <div class="field">
-      <label>Скидка (применяется к текущей сумме выше)</label>
-      <div style="display:flex;gap:8px;">
-        <select id="editDiscount" style="flex:1;">
-          <option value="none">Выбрать скидку...</option>
-          <option value="pension">Пенсионная — 10%</option>
-          <option value="promo3plus1">Акция 3+1 (по кол-ву ковров: ${c.qty_carpets||1})</option>
-        </select>
-        <button type="button" class="btn btn-ghost btn-sm" id="applyDiscountBtn" style="width:auto;padding:11px 16px;">Применить</button>
-      </div>
-      <p class="formhint" style="margin:6px 0 0;">Применяйте один раз — повторное применение посчитает скидку от уже сниженной суммы.</p>
+      <label>Скидка</label>
+      <select id="editDiscount">
+        <option value="none">Без скидки</option>
+        <option value="pension">Пенсионная — 10%</option>
+        <option value="promo3plus1">Акция 3+1 (каждый 4-й ковёр бесплатно)</option>
+      </select>
+      <p class="formhint" style="margin:6px 0 0;">Скидка считается автоматически от стоимости ковров и пересчитывается при изменении площадей и цен. После выбора нажмите «Сохранить изменения».</p>
     </div>
     <div class="field"><label>Комментарий</label><textarea id="editComment">${escapeHtml(c.comment||'')}</textarea></div>
     <button class="btn btn-primary" id="saveDetailBtn" style="margin-bottom:10px;">Сохранить изменения</button>
@@ -481,6 +499,11 @@ function openDetail(id){
   const editCost = document.getElementById('editCost');
   let editCostManual = false;
   editCost.addEventListener('input', ()=>editCostManual=true);
+  let carpetsTouched = false;   // менял ли пользователь ковры в этой карточке
+  let editInitDone = false;     // стартовое заполнение закончено
+  let activeDiscount = 'none';  // скидка, выбранная в этой карточке
+  const costAtOpen = parseFloat(c.cost) || 0;
+  const legacyCarpets = !(Array.isArray(c.carpets) && c.carpets.length); // у старых договоров нет списка ковров
 
   function editCarpetRow(value, type){
     const row = document.createElement('div');
@@ -514,21 +537,82 @@ function openDetail(id){
       type: row.querySelector('.edit-carpet-type').value
     })).filter(x=>!isNaN(x.area) && x.area>0);
   }
-  function editRecalc(){
-    const data = editGetCarpets();
-    const totalArea = data.reduce((s,x)=>s+x.area,0);
-    document.getElementById('editCarpetsCountLabel').textContent = editCarpetsList.children.length;
-    document.getElementById('editTotalAreaLabel').textContent = totalArea.toFixed(2).replace(/\.00$/,'') + ' м²';
+  function editGetCarpetsNumbered(){
+    return [...editCarpetsList.children].map((row,i)=>({
+      n: i+1,
+      area: parseFloat(row.querySelector('.edit-carpet-area').value),
+      type: row.querySelector('.edit-carpet-type').value
+    })).filter(x=>!isNaN(x.area) && x.area>0);
+  }
+  // Метка скидки в комментарии: старые метки убираем, чтобы не дублировались
+  function syncDiscountComment(label){
+    const el = document.getElementById('editComment');
+    const parts = el.value.split(' | ').filter(p => p && !/^(Пенсионная скидка|Акция 3\+1)/.test(p.trim()));
+    el.value = (label ? [label, ...parts] : parts).join(' | ');
+  }
+  // Считает стоимость по коврам и выбранной скидке (те же правила, что в форме создания)
+  function editComputeCost(){
+    const data = editGetCarpetsNumbered();
     const pn = parseFloat(editPriceNormal.value)||0, ps = parseFloat(editPriceSmell.value)||0;
-    const totalCost = data.reduce((s,x)=> s + x.area*(x.type==='smell'?ps:pn), 0);
-    if(totalArea>0 && !editCostManual) editCost.value = Math.round(totalCost);
+    let items = data.map(x => x.area*(x.type==='smell'?ps:pn));
+    let raw = items.reduce((s,v)=>s+v, 0);
+    // Старый договор без правок ковров: площади по коврам неизвестны — база для скидки это сохранённая стоимость
+    if(legacyCarpets && !carpetsTouched && activeDiscount !== 'none' && data.length){
+      raw = costAtOpen;
+      items = data.map(()=> raw / data.length);
+    }
+    let finalTotal = raw, label = '';
+    if(activeDiscount === 'pension'){
+      finalTotal = raw - raw*0.10;
+      label = 'Пенсионная скидка 10%';
+    } else if(activeDiscount === 'promo3plus1'){
+      const freeCount = Math.floor(items.length / 4);
+      if(freeCount > 0){
+        const f = freeCarpets(data.map((x,i)=>({n:x.n, area:x.area, cost:items[i]})), freeCount);
+        finalTotal = raw - f.sum;
+        label = f.label;
+      }
+    }
+    return { totalArea: data.reduce((s,x)=>s+x.area,0), finalTotal, label };
+  }
+  // Обновляет подписи и стоимость (не считается правкой ковров)
+  function editUpdate(){
+    const r = editComputeCost();
+    document.getElementById('editCarpetsCountLabel').textContent = editCarpetsList.children.length;
+    document.getElementById('editTotalAreaLabel').textContent = r.totalArea.toFixed(2).replace(/\.00$/,'') + ' м²';
+    if(editInitDone) syncDiscountComment(r.label);
+    if(r.totalArea>0 && !editCostManual) editCost.value = Math.round(r.finalTotal);
+    return r;
+  }
+  // Вызывается при правке ковров или цен
+  function editRecalc(){
+    if(editInitDone){
+      carpetsTouched = true;
+      document.getElementById('legacyCarpetsHint').style.display = 'none';
+    }
+    editUpdate();
   }
 
-  // Заполняем стартовые строки: делим текущую общую площадь поровну между известным кол-вом ковров
-  const startQty = c.qty_carpets || 1;
-  const startArea = c.area ? (parseFloat(c.area) / startQty) : '';
-  for(let i=0;i<startQty;i++){ editCarpetsList.appendChild(editCarpetRow(startArea ? Math.round(startArea*100)/100 : undefined)); }
+  // Стартовые строки: сохранённый список ковров; для старых договоров без него — деление площади поровну
+  const savedCarpets = Array.isArray(c.carpets) && c.carpets.length ? c.carpets : null;
+  if(savedCarpets){
+    savedCarpets.forEach(x => editCarpetsList.appendChild(editCarpetRow(x.area, x.type)));
+  } else {
+    const startQty = c.qty_carpets || 1;
+    const startArea = c.area ? parseFloat(c.area) / startQty : '';
+    for(let i=0;i<startQty;i++){
+      editCarpetsList.appendChild(editCarpetRow(startArea ? Math.round(startArea*100)/100 : undefined));
+    }
+  }
   editRenumber();
+  // Если сохранённая стоимость отличается от расчёта (скидка или ручная правка), она не перезаписывается
+  {
+    const rawNow = editGetCarpets().reduce((s,x)=> s + x.area*(x.type==='smell'?(parseFloat(editPriceSmell.value)||0):(parseFloat(editPriceNormal.value)||0)), 0);
+    editCostManual = Math.round(rawNow) !== Math.round(parseFloat(c.cost)||0);
+  }
+  editUpdate();
+  editInitDone = true;
+  if(legacyCarpets && (c.qty_carpets||1) > 1) document.getElementById('legacyCarpetsHint').style.display = 'block';
   document.getElementById('editAddCarpetBtn').addEventListener('click', ()=>{
     editCarpetsList.appendChild(editCarpetRow());
     editRenumber();
@@ -537,33 +621,26 @@ function openDetail(id){
   editPriceNormal.addEventListener('input', editRecalc);
   editPriceSmell.addEventListener('input', editRecalc);
 
-  document.getElementById('applyDiscountBtn').addEventListener('click', ()=>{
-    const discount = document.getElementById('editDiscount').value;
-    const editCostEl = document.getElementById('editCost');
-    const raw = parseFloat(editCostEl.value) || 0;
-    const qty = editCarpetsList.children.length || 1;
-    let discounted = raw, label = '';
-    if(discount === 'pension'){
-      discounted = raw * 0.9;
-      label = 'Пенсионная скидка 10%';
-    } else if(discount === 'promo3plus1'){
-      const freeCount = Math.floor(qty / 4);
-      if(freeCount > 0){
-        const perCarpet = raw / qty;
-        discounted = raw - perCarpet * freeCount;
-        label = `Акция 3+1: бесплатно ${freeCount} ковёр(ов)`;
-      } else {
-        showToast('Для акции 3+1 нужно минимум 4 ковра в этом договоре');
-        return;
-      }
-    } else {
-      showToast('Выберите скидку из списка');
+  document.getElementById('editDiscount').addEventListener('change', e=>{
+    const value = e.target.value;
+    if(value === 'none' && legacyCarpets && !carpetsTouched){
+      showToast('У старого договора скидку можно убрать, изменив поле «Стоимость» или указав площади ковров');
+      e.target.value = activeDiscount;
       return;
     }
-    editCost.value = Math.round(discounted);
-    const commentEl = document.getElementById('editComment');
-    commentEl.value = [label, commentEl.value].filter(Boolean).join(' | ');
-    showToast('Скидка применена — не забудьте нажать "Сохранить изменения"');
+    if(value === 'promo3plus1' && legacyCarpets && !carpetsTouched){
+      showToast('У старого договора неизвестны площади отдельных ковров. Введите их вручную, чтобы акция 3+1 выбрала самый дешёвый ковёр');
+      e.target.value = activeDiscount;
+      return;
+    }
+    if(value === 'promo3plus1' && editCarpetsList.children.length < 4){
+      showToast('Для акции 3+1 нужно минимум 4 ковра в этом договоре');
+    }
+    activeDiscount = value;
+    editCostManual = false;   // выбранная скидка заменяет ручную правку стоимости
+    const r = editUpdate();
+    if(value === 'none') syncDiscountComment('');
+    showToast(r.label ? r.label + ' — не забудьте нажать "Сохранить изменения"' : 'Стоимость пересчитана');
   });
   document.getElementById('saveDetailBtn').addEventListener('click', async ()=>{
     const cityVal = document.getElementById('editCity').value==='__other'
@@ -579,8 +656,10 @@ function openDetail(id){
         floor: document.getElementById('editFloor').value,
         apartment: document.getElementById('editApt').value,
         qty_carpets: editCarpetsList.children.length,
-        area: totalArea || null,
+        ...(legacyCarpets && !carpetsTouched ? {} : { area: totalArea || null }),
         price_per_m2: editPriceNormal.value || null,
+        price_smell: editPriceSmell.value || null,
+        ...(legacyCarpets && !carpetsTouched ? {} : { carpets: carpetsData }),
         status: document.getElementById('editStatus').value,
         assigned_courier_id: document.getElementById('editCourier').value || null,
         cost: document.getElementById('editCost').value,
